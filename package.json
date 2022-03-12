@@ -1,0 +1,16 @@
+{
+  "name": "@pye/token",
+  "version": "0.6.4",
+  "main": "index.js",
+  "author": "Pye.net",
+  "license": "MIT",
+  "devDependencies": {
+    "@openzeppelin/truffle-upgrades": "^1.9.1",
+    "truffle-plugin-verify": "^0.5.21"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "4.5.x",
+    "@truffle/hdwallet-provider": "^1.6.0",
+    "truffle-contract-size": "^2.0.1"
+  }
+}
