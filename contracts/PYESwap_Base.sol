@@ -298,6 +298,7 @@ contract PYESwap_Base is IPYE, Context, Ownable {
 
         //indicates if fee should be deducted from transfer of tokens
         bool takeFee = false;
+        
 
         //transfer amount, it will take tax
         _tokenTransfer(from, to, amount, takeFee);
@@ -307,7 +308,7 @@ contract PYESwap_Base is IPYE, Context, Ownable {
         return _tTotal.sub(balanceOf(_burnAddress)).sub(balanceOf(address(0)));
     }
 
-    function getTotalFee() internal view returns (uint256) {
+    function getTotalFee() public view returns (uint256) {
         return _defaultFees.marketingFee
             .add(_defaultFees.developmentFee);
     }
