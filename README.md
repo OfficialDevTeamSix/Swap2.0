@@ -14,5 +14,5 @@ Swap 2.0 Base Contract to be used on PYESwap
 - Deploy with Router, Fee Values, and Fee Addresses in Constructor
 
 ## PYESwap Routers
-Mainnet: 0xbE0019811270B816866e57B6d7227AFe40F11fE2   
-Testnet: 0x6b2e0d1e1d1922a08A7C7BCed77aD38a0C2A2C5d
+Mainnet: 0xEaAdD17983842db731Bd4b4dC0DbD005F4444eB6   
+Testnet: 0xBD801c79845AD4780E5778c71b0caF18DeEA0d36
