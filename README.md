@@ -16,3 +16,6 @@ Swap 2.0 Base Contract to be used on PYESwap
 ## PYESwap Routers
 Mainnet: 0xEaAdD17983842db731Bd4b4dC0DbD005F4444eB6   
 Testnet: 0xBD801c79845AD4780E5778c71b0caF18DeEA0d36
+
+## Testing Environment
+You can test your contract using testnet at https://testnet.pyeswap.com
