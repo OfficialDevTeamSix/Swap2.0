@@ -117,7 +117,7 @@ contract PYESwap_Base is IPYE, Context, Ownable {
             _development
         );
 
-        // IPYESwapPair(pyeSwapPair).updateTotalFee(500);
+        IPYESwapPair(pyeSwapPair).updateTotalFee(500);
         
         emit Transfer(address(0), _msgSender(), _tTotal);
     }
