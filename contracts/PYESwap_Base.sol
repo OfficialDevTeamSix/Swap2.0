@@ -54,6 +54,7 @@ contract PYESwap_Base is IPYE, Context, Ownable {
     mapping (uint256 => address) private pairs;
     mapping (uint256 => address) private tokens;
     uint256 private pairsLength;
+    mapping (address => bool) public _isPairAddress;
 
 
     // Set the name, symbol, and decimals here
@@ -102,6 +103,7 @@ contract PYESwap_Base is IPYE, Context, Ownable {
         tokens[pairsLength] = WBNB;
         pairs[pairsLength] = pyeSwapPair;
         pairsLength += 1;
+        _isPairAddress[pyeSwapPair] = true;
 
         _isExcludedFromFee[_msgSender()] = true;
         _isExcludedFromFee[pyeSwapPair] = true;
@@ -235,6 +237,8 @@ contract PYESwap_Base is IPYE, Context, Ownable {
 
         _isExcludedFromFee[pyeSwapPair] = true;
 
+        _isPairAddress[pyeSwapPair] = true;
+
         isTxLimitExempt[pyeSwapPair] = true;
         isTxLimitExempt[address(pyeSwapRouter)] = true;
 
@@ -322,11 +326,12 @@ contract PYESwap_Base is IPYE, Context, Ownable {
         uint8 takeFee = 0;
         if(_isPairAddress[to] && from != address(pyeSwapRouter) && !isExcludedFromFee(from)) {
             takeFee = 1;
-        } else if(_includeSwapFee[from] && !isExcludedFromFee(to)) {
-            takeFee = 2;
-        } else if(_includeSwapFee[to] && !isExcludedFromFee(from)) {
-            takeFee = 3;
-        }
+        } 
+        // else if(_includeSwapFee[from] && !isExcludedFromFee(to)) {
+        //     takeFee = 2;
+        // } else if(_includeSwapFee[to] && !isExcludedFromFee(from)) {
+        //     takeFee = 3;
+        // }
 
         //transfer amount, it will take tax
         _tokenTransfer(from, to, amount, takeFee);
@@ -342,7 +347,7 @@ contract PYESwap_Base is IPYE, Context, Ownable {
     }
 
     //this method is responsible for taking all fee, if takeFee is true
-    function _tokenTransfer(address sender, address recipient, uint256 amount, bool takeFee) private {
+    function _tokenTransfer(address sender, address recipient, uint256 amount, uint8 takeFee) private {
         // if(!takeFee) {
         //     removeAllFee();
         // }
@@ -431,6 +436,7 @@ contract PYESwap_Base is IPYE, Context, Ownable {
 
         if(!_checkPairRegistered(_pair)) {
             _isExcludedFromFee[_pair] = true;
+            _isPairAddress[_pair] = true;
             isTxLimitExempt[_pair] = true;
 
             pairs[pairsLength] = _pair;
