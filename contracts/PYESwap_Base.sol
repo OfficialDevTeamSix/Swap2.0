@@ -96,7 +96,7 @@ contract PYESwap_Base is IPYE, Context, Ownable {
         pyeSwapRouter = IPYESwapRouter(_router);
         WBNB = pyeSwapRouter.WETH();
         pyeSwapPair = IPYESwapFactory(pyeSwapRouter.factory())
-        .createPair(address(this), WBNB, true);
+        .createPair(address(this), WBNB, true, address(this));
 
         tokens[pairsLength] = WBNB;
         pairs[pairsLength] = pyeSwapPair;
@@ -117,7 +117,7 @@ contract PYESwap_Base is IPYE, Context, Ownable {
             _development
         );
 
-        IPYESwapPair(pyeSwapPair).updateTotalFee(500);
+        // IPYESwapPair(pyeSwapPair).updateTotalFee(500);
         
         emit Transfer(address(0), _msgSender(), _tTotal);
     }
@@ -180,18 +180,17 @@ contract PYESwap_Base is IPYE, Context, Ownable {
         _isExcludedFromFee[account] = false;
     }
 
-    function _updatePairsFee() internal {
-        for (uint j = 0; j < pairsLength; j++) {
-            IPYESwapPair(pairs[j]).updateTotalFee(getTotalFee());
-        }
-    }
+    // function _updatePairsFee() internal {
+    //     for (uint j = 0; j < pairsLength; j++) {
+    //         IPYESwapPair(pairs[j]).updateTotalFee(getTotalFee());
+    //     }
+    // }
 
 
     // Functions to update fees and addresses 
 
     function setDevelopmentPercent(uint256 _developmentFee) external onlyOwner {
         _defaultFees.developmentFee = _developmentFee;
-        _updatePairsFee();
     }
 
     function setDevelopmentAddress(address _development) external onlyOwner {
@@ -201,7 +200,6 @@ contract PYESwap_Base is IPYE, Context, Ownable {
 
     function setMarketingPercent(uint256 _marketingFee) external onlyOwner {
         _defaultFees.marketingFee = _marketingFee;
-        _updatePairsFee();
     }
 
     function setMarketingAddress(address _marketing) external onlyOwner {
@@ -225,7 +223,7 @@ contract PYESwap_Base is IPYE, Context, Ownable {
         pairs[0] = pyeSwapPair;
         tokens[0] = WBNB;
 
-        IPYESwapPair(pyeSwapPair).updateTotalFee(getTotalFee());
+        // IPYESwapPair(pyeSwapPair).updateTotalFee(getTotalFee());
     }
 
     // To update the max tx amount
@@ -351,7 +349,7 @@ contract PYESwap_Base is IPYE, Context, Ownable {
     }
 
     // This function transfers the fees to the correct addresses. 
-    function depositLPFee(uint256 amount, address token) public onlyExchange {
+    function handleFee(uint256 amount, address token) public onlyExchange {
         uint256 tokenIndex = _getTokenIndex(token);
         if(tokenIndex < pairsLength) {
             uint256 allowanceT = IERC20(token).allowance(msg.sender, address(this));
@@ -396,7 +394,7 @@ contract PYESwap_Base is IPYE, Context, Ownable {
 
             pairsLength += 1;
 
-            IPYESwapPair(_pair).updateTotalFee(getTotalFee());
+            // IPYESwapPair(_pair).updateTotalFee(getTotalFee());
         }
     }
 

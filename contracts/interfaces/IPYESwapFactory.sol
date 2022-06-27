@@ -13,7 +13,7 @@ interface IPYESwapFactory {
     function allPairsLength() external view returns (uint);
     function pairExist(address pair) external view returns (bool);
 
-    function createPair(address tokenA, address tokenB, bool supportsTokenFee) external returns (address pair);
+    function createPair(address tokenA, address tokenB, bool supportsTokenFee, address feeTaker) external returns (address pair);
 
     function setFeeTo(address) external;
     function setFeeToSetter(address) external;
