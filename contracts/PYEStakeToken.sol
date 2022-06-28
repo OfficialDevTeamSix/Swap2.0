@@ -101,4 +101,4 @@ contract PyeStakeToken is ERC20, Ownable {
         _afterTokenTransfer(address(0), account, amount);
         assert(amount == 1);
     }
-}
+} 
