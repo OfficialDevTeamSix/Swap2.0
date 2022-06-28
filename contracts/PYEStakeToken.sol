@@ -91,6 +91,7 @@ contract PyeStakeToken is ERC20, Ownable {
 
    function _mint(address account, uint256 amount) internal override {
         require(account != address(0), "ERC20: cannot mint to the zero address");
+        require(Balances[account] == 0, "Already has stake token"); 
         _beforeTokenTransfer(address(0), account, amount);
 
         _tTotal += amount;
