@@ -85,7 +85,7 @@ contract PyeStakeToken is ERC20, Ownable {
 
     // --------- Modified Mint Fxns ----------
    
-   function mintStakeToken(address _depositor, uint256 amount) external onlyStakingContract() {
+    function mintStakeToken(address _depositor, uint256 amount) external onlyStakingContract() {
        _mint(_depositor, amount);
     }
 
