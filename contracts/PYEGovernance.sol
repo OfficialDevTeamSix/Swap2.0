@@ -48,6 +48,7 @@ contract PYEGovernance{
 
     function vote(uint proposalID, bool sel) public onlyHolders {
         require(voted[proposalID][msg.sender]==false, "Already voted on prop");
+        require(block.timestamp < proposals[proposalID].votingDeadline, "voting is closed");
         if(sel){
             proposals[proposalID].votesReceived +=1;
             emit Vote(proposalID, sel);
@@ -76,7 +77,7 @@ contract PYEGovernance{
 
         proposals[propID].votesNeeded = vNeeded;
         proposals[propID].submitter = msg.sender;
-        proposals[propID].votingDeadline = deadline;
+        proposals[propID].votingDeadline = block.timestamp + deadline;
         proposals[propID].prop = newprop;
 
         currprop++;
