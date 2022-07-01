@@ -7,14 +7,12 @@ interface IPYESwapPair {
     event Transfer(address indexed from, address indexed to, uint value);
 
     function baseToken() external view returns (address);
-    function getTotalFee() external view returns (uint);
     function name() external pure returns (string memory);
     function symbol() external pure returns (string memory);
     function decimals() external pure returns (uint8);
     function totalSupply() external view returns (uint);
     function balanceOf(address owner) external view returns (uint);
     function allowance(address owner, address spender) external view returns (uint);
-    function updateTotalFee(uint totalFee) external returns (bool);
 
     function approve(address spender, uint value) external returns (bool);
     function transfer(address to, uint value) external returns (bool);
