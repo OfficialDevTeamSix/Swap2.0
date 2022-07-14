@@ -1,21 +1,17 @@
 
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./interfaces/IPYE.sol";
 import "./interfaces/IERC20.sol";
-import "./interfaces/IWETH.sol";
 import "./interfaces/IPYESwapFactory.sol";
-import "./interfaces/IPYESwapPair.sol";
 import "./interfaces/IPYESwapRouter.sol";
 
 
-contract PYESwap_Base is IPYE, Context, Ownable {
+contract PYESwap_Base is IERC20, Context, Ownable {
     using SafeMath for uint256;
     using Address for address;
 
@@ -54,6 +50,7 @@ contract PYESwap_Base is IPYE, Context, Ownable {
     mapping (uint256 => address) private pairs;
     mapping (uint256 => address) private tokens;
     uint256 private pairsLength;
+    mapping (address => bool) public _isPairAddress;
 
 
     // Set the name, symbol, and decimals here
@@ -62,6 +59,7 @@ contract PYESwap_Base is IPYE, Context, Ownable {
     uint8 constant _decimals = 9;
 
     Fees public _defaultFees;
+    Fees public _sellFees;
     Fees private _previousFees;
     Fees private _emptyFees;
 
@@ -90,17 +88,18 @@ contract PYESwap_Base is IPYE, Context, Ownable {
     }
 
     // Edit the constructor in order to declare default fees on deployment
-    constructor(address _router, address _marketing, uint256 _marketingFee, address _development, uint256 _developmentFee) {
+    constructor(address _router, address _marketing, uint256 _marketingFeeBuy, uint256 _marketingFeeSell, address _development, uint256 _developmentFeeBuy, uint256 _developmentFeeSell) {
         _balances[_msgSender()] = _tTotal;
 
         pyeSwapRouter = IPYESwapRouter(_router);
         WBNB = pyeSwapRouter.WETH();
         pyeSwapPair = IPYESwapFactory(pyeSwapRouter.factory())
-        .createPair(address(this), WBNB, true);
+        .createPair(address(this), WBNB, true, address(this));
 
         tokens[pairsLength] = WBNB;
         pairs[pairsLength] = pyeSwapPair;
         pairsLength += 1;
+        _isPairAddress[pyeSwapPair] = true;
 
         _isExcludedFromFee[_msgSender()] = true;
         _isExcludedFromFee[pyeSwapPair] = true;
@@ -111,13 +110,18 @@ contract PYESwap_Base is IPYE, Context, Ownable {
 
         // This should match the struct Fee
         _defaultFees = Fees(
-            _marketingFee,
-            _developmentFee,
+            _marketingFeeBuy,
+            _developmentFeeBuy,
             _marketing,
             _development
         );
 
-        IPYESwapPair(pyeSwapPair).updateTotalFee(500);
+        _sellFees = Fees(
+            _marketingFeeSell,
+            _developmentFeeSell,
+            _marketing,
+            _development
+        );
         
         emit Transfer(address(0), _msgSender(), _tTotal);
     }
@@ -180,33 +184,34 @@ contract PYESwap_Base is IPYE, Context, Ownable {
         _isExcludedFromFee[account] = false;
     }
 
-    function _updatePairsFee() internal {
-        for (uint j = 0; j < pairsLength; j++) {
-            IPYESwapPair(pairs[j]).updateTotalFee(getTotalFee());
-        }
-    }
-
-
     // Functions to update fees and addresses 
 
-    function setDevelopmentPercent(uint256 _developmentFee) external onlyOwner {
-        _defaultFees.developmentFee = _developmentFee;
-        _updatePairsFee();
+    function setDevelopmentPercentBuy(uint256 _developmentFeeBuy) external onlyOwner {
+        _defaultFees.developmentFee = _developmentFeeBuy;
+    }
+
+    function setDevelopmentPercentSell(uint256 _developmentFeeSell) external onlyOwner {
+        _sellFees.developmentFee = _developmentFeeSell;
     }
 
     function setDevelopmentAddress(address _development) external onlyOwner {
         require(_development != address(0), "PYE: Address Zero is not allowed");
         _defaultFees.developmentAddress = _development;
+        _sellFees.developmentAddress = _development;
     }
 
-    function setMarketingPercent(uint256 _marketingFee) external onlyOwner {
-        _defaultFees.marketingFee = _marketingFee;
-        _updatePairsFee();
+    function setMarketingPercentBuy(uint256 _marketingFeeBuy) external onlyOwner {
+        _defaultFees.marketingFee = _marketingFeeBuy;
+    }
+
+    function setMarketingPercentSell(uint256 _marketingFeeSell) external onlyOwner {
+        _sellFees.marketingFee = _marketingFeeSell;
     }
 
     function setMarketingAddress(address _marketing) external onlyOwner {
         require(_marketing != address(0), "PYE: Address Zero is not allowed");
         _defaultFees.marketingAddress = _marketing;
+        _sellFees.marketingAddress = _marketing;
     }
 
 
@@ -219,13 +224,13 @@ contract PYESwap_Base is IPYE, Context, Ownable {
 
         _isExcludedFromFee[pyeSwapPair] = true;
 
+        _isPairAddress[pyeSwapPair] = true;
+
         isTxLimitExempt[pyeSwapPair] = true;
         isTxLimitExempt[address(pyeSwapRouter)] = true;
 
         pairs[0] = pyeSwapPair;
         tokens[0] = WBNB;
-
-        IPYESwapPair(pyeSwapPair).updateTotalFee(getTotalFee());
     }
 
     // To update the max tx amount
@@ -259,6 +264,10 @@ contract PYESwap_Base is IPYE, Context, Ownable {
     function removeAllFee() private {
         _previousFees = _defaultFees;
         _defaultFees = _emptyFees;
+    }
+
+    function setSellFee() private {
+        _defaultFees = _sellFees;
     }
 
     function restoreAllFee() private {
@@ -297,8 +306,10 @@ contract PYESwap_Base is IPYE, Context, Ownable {
         checkTxLimit(from, amount);
 
         //indicates if fee should be deducted from transfer of tokens
-        bool takeFee = false;
-        
+        uint8 takeFee = 0;
+        if(_isPairAddress[to] && from != address(pyeSwapRouter) && !isExcludedFromFee(from)) {
+            takeFee = 1;
+        } 
 
         //transfer amount, it will take tax
         _tokenTransfer(from, to, amount, takeFee);
@@ -308,16 +319,26 @@ contract PYESwap_Base is IPYE, Context, Ownable {
         return _tTotal.sub(balanceOf(_burnAddress)).sub(balanceOf(address(0)));
     }
 
-    function getTotalFee() public view returns (uint256) {
+    function getTotalFee(address account) public view returns (uint256) {
+        if(_isExcludedFromFee[account]) {
+            return 0;
+        } else {
+        return _defaultFees.marketingFee
+            .add(_defaultFees.developmentFee);
+        }
+    }
+
+    function getFee() public view returns (uint256) {
         return _defaultFees.marketingFee
             .add(_defaultFees.developmentFee);
     }
 
     //this method is responsible for taking all fee, if takeFee is true
-    function _tokenTransfer(address sender, address recipient, uint256 amount, bool takeFee) private {
-        if(!takeFee) {
+    function _tokenTransfer(address sender, address recipient, uint256 amount, uint8 takeFee) private {
+        if(takeFee == 0 || takeFee == 1) {
             removeAllFee();
         }
+
 
         FeeValues memory _values = _getValues(amount);
         _balances[sender] = _balances[sender].sub(amount, "Insufficient Balance");
@@ -326,9 +347,11 @@ contract PYESwap_Base is IPYE, Context, Ownable {
 
         emit Transfer(sender, recipient, _values.transferAmount);
 
-        if(!takeFee) {
+        if(takeFee == 0) {
             restoreAllFee();
-        }
+        } else if(takeFee == 1) {
+            setSellFee();
+        } 
     }
 
     function _takeFees(FeeValues memory values) private {
@@ -352,7 +375,7 @@ contract PYESwap_Base is IPYE, Context, Ownable {
     }
 
     // This function transfers the fees to the correct addresses. 
-    function depositLPFee(uint256 amount, address token) public onlyExchange {
+    function handleFee(uint256 amount, address token) public onlyExchange {
         uint256 tokenIndex = _getTokenIndex(token);
         if(tokenIndex < pairsLength) {
             uint256 allowanceT = IERC20(token).allowance(msg.sender, address(this));
@@ -360,12 +383,14 @@ contract PYESwap_Base is IPYE, Context, Ownable {
                 IERC20(token).transferFrom(msg.sender, address(this), amount);
 
                 // All fees to be declared here in order to be calculated and sent
-                uint256 totalFee = getTotalFee();
+                uint256 totalFee = getFee();
                 uint256 marketingFeeAmount = amount.mul(_defaultFees.marketingFee).div(totalFee);
                 uint256 developmentFeeAmount = amount.mul(_defaultFees.developmentFee).div(totalFee);
 
                 IERC20(token).transfer(_defaultFees.marketingAddress, marketingFeeAmount);
                 IERC20(token).transfer(_defaultFees.developmentAddress, developmentFeeAmount);
+
+                restoreAllFee();
             }
         }
     }
@@ -390,14 +415,13 @@ contract PYESwap_Base is IPYE, Context, Ownable {
 
         if(!_checkPairRegistered(_pair)) {
             _isExcludedFromFee[_pair] = true;
+            _isPairAddress[_pair] = true;
             isTxLimitExempt[_pair] = true;
 
             pairs[pairsLength] = _pair;
             tokens[pairsLength] = _token;
 
             pairsLength += 1;
-
-            IPYESwapPair(_pair).updateTotalFee(getTotalFee());
         }
     }
 
