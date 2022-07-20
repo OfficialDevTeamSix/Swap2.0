@@ -1,6 +1,6 @@
 
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.15;
 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
@@ -11,7 +11,7 @@ import "./interfaces/IPYESwapFactory.sol";
 import "./interfaces/IPYESwapRouter.sol";
 
 
-contract PYESwap_Base is IERC20, Context, Ownable {
+contract PYESwap_Base is IERC20, Ownable {
     using SafeMath for uint256;
     using Address for address;
 
@@ -51,6 +51,8 @@ contract PYESwap_Base is IERC20, Context, Ownable {
     mapping (uint256 => address) private tokens;
     uint256 private pairsLength;
     mapping (address => bool) public _isPairAddress;
+    // Outside Swap Pairs
+    mapping (address => bool) private _includeSwapFee;
 
 
     // Set the name, symbol, and decimals here
@@ -58,10 +60,13 @@ contract PYESwap_Base is IERC20, Context, Ownable {
     string constant _symbol = "BASE";
     uint8 constant _decimals = 9;
 
-    Fees public _defaultFees;
-    Fees public _sellFees;
+    Fees private _defaultFees;
+    Fees public _buyFees;
     Fees private _previousFees;
     Fees private _emptyFees;
+    Fees public _sellFees;
+    Fees private _outsideBuyFees;
+    Fees private _outsideSellFees;
 
     IPYESwapRouter public pyeSwapRouter;
     address public pyeSwapPair;
@@ -116,7 +121,28 @@ contract PYESwap_Base is IERC20, Context, Ownable {
             _development
         );
 
+        _buyFees = Fees(
+            _marketingFeeBuy,
+            _developmentFeeBuy,
+            _marketing,
+            _development
+        );
+
         _sellFees = Fees(
+            _marketingFeeSell,
+            _developmentFeeSell,
+            _marketing,
+            _development
+        );
+
+        _outsideBuyFees = Fees(
+            _marketingFeeBuy,
+            _developmentFeeBuy,
+            _marketing,
+            _development
+        );
+
+        _outsideSellFees = Fees(
             _marketingFeeSell,
             _developmentFeeSell,
             _marketing,
@@ -186,32 +212,43 @@ contract PYESwap_Base is IERC20, Context, Ownable {
 
     // Functions to update fees and addresses 
 
-    function setDevelopmentPercentBuy(uint256 _developmentFeeBuy) external onlyOwner {
-        _defaultFees.developmentFee = _developmentFeeBuy;
+     // set fee values on buys
+    function setBuyFees(uint256 _marketingFee, uint256 _developmentFee) external onlyOwner {
+        _defaultFees.marketingFee = _marketingFee;
+        _defaultFees.developmentFee = _developmentFee;
+
+        _buyFees.marketingFee = _marketingFee;
+        _buyFees.developmentFee = _developmentFee;
+
+        _outsideBuyFees.marketingFee = _marketingFee;
+        _outsideBuyFees.developmentFee = _developmentFee;
     }
 
-    function setDevelopmentPercentSell(uint256 _developmentFeeSell) external onlyOwner {
-        _sellFees.developmentFee = _developmentFeeSell;
+    // set fee values on sells
+    function setSellFees(uint256 _marketingFee, uint256 _developmentFee) external onlyOwner {
+        _sellFees.marketingFee = _marketingFee;
+        _sellFees.developmentFee = _developmentFee;
+
+        _outsideSellFees.marketingFee = _marketingFee;
+        _outsideSellFees.developmentFee = _developmentFee;  
     }
 
     function setDevelopmentAddress(address _development) external onlyOwner {
         require(_development != address(0), "PYE: Address Zero is not allowed");
         _defaultFees.developmentAddress = _development;
+        _buyFees.developmentAddress = _development;
         _sellFees.developmentAddress = _development;
-    }
-
-    function setMarketingPercentBuy(uint256 _marketingFeeBuy) external onlyOwner {
-        _defaultFees.marketingFee = _marketingFeeBuy;
-    }
-
-    function setMarketingPercentSell(uint256 _marketingFeeSell) external onlyOwner {
-        _sellFees.marketingFee = _marketingFeeSell;
+        _outsideBuyFees.developmentAddress = _development;
+        _outsideSellFees.developmentAddress = _development;
     }
 
     function setMarketingAddress(address _marketing) external onlyOwner {
         require(_marketing != address(0), "PYE: Address Zero is not allowed");
         _defaultFees.marketingAddress = _marketing;
+        _buyFees.marketingAddress = _marketing;
         _sellFees.marketingAddress = _marketing;
+        _outsideBuyFees.marketingAddress = _marketing;
+        _outsideSellFees.marketingAddress = _marketing;
     }
 
 
@@ -231,6 +268,14 @@ contract PYESwap_Base is IERC20, Context, Ownable {
 
         pairs[0] = pyeSwapPair;
         tokens[0] = WBNB;
+    }
+
+    function addOutsideSwapPair(address account) public onlyOwner {
+        _includeSwapFee[account] = true;
+    }
+
+    function removeOutsideSwapPair(address account) public onlyOwner {
+        _includeSwapFee[account] = false;
     }
 
     // To update the max tx amount
@@ -268,6 +313,16 @@ contract PYESwap_Base is IERC20, Context, Ownable {
 
     function setSellFee() private {
         _defaultFees = _sellFees;
+    }
+
+    function setOutsideBuyFee() private {
+        _previousFees = _defaultFees;
+        _defaultFees = _outsideBuyFees;
+    }
+
+    function setOutsideSellFee() private {
+        _previousFees = _defaultFees;
+        _defaultFees = _outsideSellFees;
     }
 
     function restoreAllFee() private {
@@ -309,7 +364,11 @@ contract PYESwap_Base is IERC20, Context, Ownable {
         uint8 takeFee = 0;
         if(_isPairAddress[to] && from != address(pyeSwapRouter) && !isExcludedFromFee(from)) {
             takeFee = 1;
-        } 
+        } else if(_includeSwapFee[from]) {
+            takeFee = 2;
+        } else if(_includeSwapFee[to]) {
+            takeFee = 3;
+        }
 
         //transfer amount, it will take tax
         _tokenTransfer(from, to, amount, takeFee);
@@ -337,6 +396,10 @@ contract PYESwap_Base is IERC20, Context, Ownable {
     function _tokenTransfer(address sender, address recipient, uint256 amount, uint8 takeFee) private {
         if(takeFee == 0 || takeFee == 1) {
             removeAllFee();
+        } else if(takeFee == 2) {
+            setOutsideBuyFee();
+        } else if(takeFee == 3) {
+            setOutsideSellFee();
         }
 
 
@@ -351,6 +414,10 @@ contract PYESwap_Base is IERC20, Context, Ownable {
             restoreAllFee();
         } else if(takeFee == 1) {
             setSellFee();
+        } else if(takeFee == 2 || takeFee == 3) {
+            restoreAllFee();
+            emit Transfer(sender, _defaultFees.developmentAddress, _values.development);
+            emit Transfer(sender, _defaultFees.marketingAddress, _values.marketing);
         } 
     }
 
